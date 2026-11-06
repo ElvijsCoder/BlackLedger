@@ -130,6 +130,12 @@ fun Data.addItem(name: String): Data {
 fun Data.mark(id: Int, s: ItemState): Data = copy(items = items.map { if (it.id == id) it.copy(state = s) else it })
 fun Data.removeItem(id: Int): Data = copy(items = items.filterNot { it.id == id })
 
+fun Data.renameItem(id: Int, name: String): Data {
+    val n = name.trim()
+    if (n.isEmpty()) return this
+    return copy(items = items.map { if (it.id == id) it.copy(name = n) else it })
+}
+
 /** Files the trip into the log; whatever wasn't got and is in [carry] goes on the next requisition. */
 fun Data.endTrip(carry: Set<Int>, today: LocalDate): Data = copy(
     items = items.filter { it.state != ItemState.GOT && it.id in carry }.map { it.copy(state = ItemState.TO_GET) },
@@ -140,6 +146,8 @@ fun Data.endTrip(carry: Set<Int>, today: LocalDate): Data = copy(
         na = items.filter { it.state == ItemState.NA }.map { it.name },
     ),
 )
+
+fun Data.deleteTrip(n: Int): Data = copy(trips = trips.filterNot { it.n == n })
 
 // Alarms
 

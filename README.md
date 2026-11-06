@@ -42,13 +42,16 @@ Black and white, one red for things that went wrong. No accounts, no cloud, no b
 - **Next on file** shows what's coming after today.
 
 ### Log
-- This week as a strand, everything missed this month, the last ten runs of every recurring directive as dots, and **past requisitions**: what each trip got and what the shop didn't have.
+- This week as a strand, everything missed this month, the last ten runs of every recurring directive as dots, and **past requisitions**: tap a trip to open what it got and what the shop didn't have; hold it to delete.
 
 ### Requisition
 - **Type and press enter.** The keyboard stays up. `milk, bread, eggs` files three at once.
 - **✓ Got** or **✕ Was not able to get.** Tap anything in the Got or N/A sections to put it back.
-- **Long-press** an item to strike it off entirely.
+- **Tap** an item's name to fix it; **long-press** to strike it off entirely.
 - **End trip · file report.** Shows what you got and what you didn't, and asks per item whether to carry it over or drop it. Then **File report** with those choices, or **Drop all** to start clean.
+
+### Feel
+- A light tick when you clear a directive or get an item, a firmer double tap for N/A, in the app and on the widget. Follows the phone's touch-feedback setting.
 
 ### Moving around
 - **To do · Shopping · Log** are three pages: swipe between them or tap the tabs; the underline follows your finger.
@@ -77,7 +80,7 @@ Black and white, one red for things that went wrong. No accounts, no cloud, no b
 | Edit or delete one | Tap its name |
 | Log and past trips | Swipe to **Log**, or **MISSED LOG** under Next on file |
 | Shopping list | **Shopping** tab, or the widget's *Shop* |
-| Remove a shopping item | Long-press its name |
+| Rename / remove a shopping item | Tap / long-press its name |
 | End the trip | **End trip · file report** |
 | Widget | Home screen → Widgets → **Black Ledger** |
 

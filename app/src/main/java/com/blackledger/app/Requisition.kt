@@ -21,6 +21,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,6 +29,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
@@ -35,9 +39,11 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import java.time.LocalDate
@@ -50,7 +56,11 @@ fun RequisitionScreen(data: Data, go: (Screen) -> Unit) {
     val toGet = data.items.filter { it.state == ItemState.TO_GET }
     val got = data.items.filter { it.state == ItemState.GOT }
     val na = data.items.filter { it.state == ItemState.NA }
-    val set = { id: Int, s: ItemState -> Ledger.update(ctx) { it.mark(id, s) } }
+    val buzz = rememberHaptics()
+    val set = { id: Int, s: ItemState ->
+        if (s != ItemState.TO_GET) buzz(s == ItemState.GOT)
+        Ledger.update(ctx) { it.mark(id, s) }
+    }
 
     Column(Modifier.fillMaxSize().padding(top = 18.dp, bottom = 24.dp)) {
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -69,7 +79,13 @@ fun RequisitionScreen(data: Data, go: (Screen) -> Unit) {
                 }
             }
             if (toGet.isNotEmpty()) item { Txt("TO GET", label()) }
-            items(toGet, key = { it.id }) { item -> ToGetRow(item, set, onRemove = { Ledger.update(ctx) { it.removeItem(item.id) } }) }
+            items(toGet, key = { it.id }) { item ->
+                ToGetRow(
+                    item, set,
+                    onRename = { name -> Ledger.update(ctx) { it.renameItem(item.id, name) } },
+                    onRemove = { Ledger.update(ctx) { it.removeItem(item.id) } },
+                )
+            }
             if (got.isNotEmpty()) item { Txt("GOT · TAP TO UNDO", label()) }
             items(got, key = { it.id }) { item ->
                 Txt(item.name, body(16, Ink.Dim), Modifier.fillMaxWidth().heightIn(min = 40.dp)
@@ -94,17 +110,44 @@ fun RequisitionScreen(data: Data, go: (Screen) -> Unit) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ToGetRow(item: Item, set: (Int, ItemState) -> Unit, onRemove: () -> Unit) = Row(
-    Modifier.fillMaxWidth().height(56.dp).drawBehind {
-        drawLine(Ink.Line, Offset(0f, size.height), Offset(size.width, size.height), 1.dp.toPx())
-    },
-    horizontalArrangement = Arrangement.spacedBy(10.dp),
-    verticalAlignment = Alignment.CenterVertically,
-) {
-    // Long-press the name to strike it off the list entirely.
-    Txt(item.name, body(17), Modifier.weight(1f).combinedClickable(onLongClick = onRemove, onClick = {}))
-    RoundButton(Glyph.CHECK, "Got ${item.name}", ring = Ink.White, tint = Ink.White) { set(item.id, ItemState.GOT) }
-    RoundButton(Glyph.CROSS, "Was not able to get ${item.name}", ring = Ink.Faint, tint = Ink.Dim) { set(item.id, ItemState.NA) }
+private fun ToGetRow(item: Item, set: (Int, ItemState) -> Unit, onRename: (String) -> Unit, onRemove: () -> Unit) {
+    var editing by remember { mutableStateOf(false) }
+    Row(
+        Modifier.fillMaxWidth().height(56.dp).drawBehind {
+            drawLine(if (editing) Ink.White else Ink.Line, Offset(0f, size.height), Offset(size.width, size.height), 1.dp.toPx())
+        },
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (editing) {
+            RenameField(item.name, Modifier.weight(1f)) { name -> onRename(name); editing = false }
+        } else {
+            // Tap the name to fix it; long-press to strike it off the list entirely.
+            Txt(item.name, body(17), Modifier.weight(1f).combinedClickable(onLongClick = onRemove, onClick = { editing = true }))
+        }
+        RoundButton(Glyph.CHECK, "Got ${item.name}", ring = Ink.White, tint = Ink.White) { set(item.id, ItemState.GOT) }
+        RoundButton(Glyph.CROSS, "Was not able to get ${item.name}", ring = Ink.Faint, tint = Ink.Dim) { set(item.id, ItemState.NA) }
+    }
+}
+
+/** Inline rename: opens focused with the cursor at the end; enter or tapping away saves. */
+@Composable
+private fun RenameField(name: String, modifier: Modifier, onDone: (String) -> Unit) {
+    var value by remember { mutableStateOf(TextFieldValue(name, TextRange(name.length))) }
+    var hadFocus by remember { mutableStateOf(false) }
+    val focus = remember { FocusRequester() }
+    BasicTextField(
+        value = value,
+        onValueChange = { value = it },
+        modifier = modifier.focusRequester(focus).semantics { contentDescription = "Rename $name" }
+            .onFocusChanged { if (it.isFocused) hadFocus = true else if (hadFocus) onDone(value.text) },
+        singleLine = true,
+        textStyle = body(17),
+        cursorBrush = SolidColor(Ink.White),
+        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { onDone(value.text) }),
+    )
+    LaunchedEffect(Unit) { focus.requestFocus() }
 }
 
 @Composable

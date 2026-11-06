@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
+import android.view.HapticFeedbackConstants
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
@@ -29,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
@@ -215,3 +217,10 @@ fun Chip(text: String, on: Boolean, onClick: () -> Unit) = Box(
 
 @Composable
 fun Divider() = Box(Modifier.fillMaxWidth().height(1.dp).background(Ink.Line))
+
+/** A light tick for done / got, a firmer one for N/A. Follows the phone's touch-feedback setting. */
+@Composable
+fun rememberHaptics(): (Boolean) -> Unit {
+    val view = LocalView.current
+    return { ok -> view.performHapticFeedback(if (ok) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.REJECT) }
+}

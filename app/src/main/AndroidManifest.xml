@@ -5,6 +5,8 @@
     <!-- Granted on install: lets alerts ring on the minute without a settings detour. -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Taps on the widget get the same small tick as taps in the app. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- No backups: the ledger never leaves the phone, not even to Google Drive. -->
     <application

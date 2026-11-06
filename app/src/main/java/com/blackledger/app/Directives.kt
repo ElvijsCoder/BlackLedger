@@ -1,6 +1,13 @@
 package com.blackledger.app
 
 import androidx.compose.foundation.clickable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -69,6 +76,7 @@ fun DirectivesScreen(data: Data, today: LocalDate, go: (Screen) -> Unit) {
     val cleared = rows.count { it.status == Status.CLEARED }
     val missedWeek = data.log.count { !it.cleared && it.date >= today.with(DayOfWeek.MONDAY) }
     val upcoming = data.upcoming(today)
+    val buzz = rememberHaptics()
 
     Column(Modifier.fillMaxSize().padding(top = 18.dp, bottom = 24.dp)) {
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -79,7 +87,7 @@ fun DirectivesScreen(data: Data, today: LocalDate, go: (Screen) -> Unit) {
             item {
                 if (rows.isEmpty()) Txt("Nothing on file today.", body(16, Ink.Dim), Modifier.padding(vertical = 12.dp))
                 else Route(rows, today,
-                    onToggle = { id -> Ledger.update(ctx) { it.toggle(id, today, LocalTime.now()) } },
+                    onToggle = { id -> buzz(true); Ledger.update(ctx) { it.toggle(id, today, LocalTime.now()) } },
                     onOpen = { id -> go(Screen.Edit(id)) })
             }
             if (upcoming.isNotEmpty()) item {
@@ -211,22 +219,59 @@ fun LogScreen(data: Data, today: LocalDate) {
                 Divider()
             }
         }
-        item { Txt("PAST REQUISITIONS", label()) }
+        item { Txt("PAST REQUISITIONS · TAP TO OPEN · HOLD TO DELETE", label()) }
         if (trips.isEmpty()) item { Txt("No trips filed yet.", body(16, Ink.Dim)) }
-        items(trips) { t ->
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                    Txt("TRIP %03d · %s".format(t.n, SHORT.format(t.date).uppercase()), label(Ink.White))
-                    Txt(buildAnnotatedString {
-                        append("${t.got.size} GOT")
-                        if (t.na.isNotEmpty()) withStyle(SpanStyle(color = Ink.Red)) { append(" · ${t.na.size} N/A") }
-                    }, label())
+        items(trips, key = { it.n }) { t -> TripRow(t) }
+    }
+}
+
+/** One filed trip: closed it's a single line; tap opens what was got and missed; hold asks to delete. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun TripRow(t: Trip) {
+    val ctx = LocalContext.current
+    var open by remember { mutableStateOf(false) }
+    var confirm by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                .combinedClickable(onClick = { open = !open; confirm = false }, onLongClick = { confirm = true }),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Txt(if (open) "−" else "+", body(18, Ink.Dim))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Txt("Trip ${t.n}", body(17, weight = FontWeight.Normal))
+                Txt(SHORT.format(t.date).uppercase(), label())
+            }
+            Txt(buildAnnotatedString {
+                append("${t.got.size} GOT")
+                if (t.na.isNotEmpty()) withStyle(SpanStyle(color = Ink.Red)) { append(" · ${t.na.size} N/A") }
+            }, label())
+        }
+        AnimatedVisibility(open) {
+            Column(Modifier.padding(start = 26.dp, bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (t.got.isEmpty() && t.na.isEmpty()) Txt("Nothing was ticked on this trip.", body(15, Ink.Dim))
+                for (name in t.got) Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Node(Dot.DONE, 9.dp); Txt(name, body(15, Ink.Dim))
                 }
-                if (t.got.isNotEmpty()) Txt(t.got.joinToString(" · "), body(15, Ink.Dim))
-                if (t.na.isNotEmpty()) Txt("N/A: " + t.na.joinToString(" · "), body(15, Ink.Red))
-                Divider()
+                for (name in t.na) Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Node(Dot.LATE, 9.dp); Txt(name, body(15))
+                }
             }
         }
+        if (confirm) {
+            Row(
+                Modifier.fillMaxWidth().padding(start = 26.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Txt("DELETE TRIP ${t.n}?", label(Ink.Red), Modifier.weight(1f))
+                Chip("Keep", on = false) { confirm = false }
+                Chip("Delete", on = true) { Ledger.update(ctx) { it.deleteTrip(t.n) } }
+            }
+        }
+        Divider()
     }
 }
 

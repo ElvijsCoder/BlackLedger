@@ -10,6 +10,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.VibrationAttributes
+import android.os.VibrationEffect
+import android.os.VibratorManager
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -130,14 +133,21 @@ class LedgerReceiver : BroadcastReceiver() {
         when (intent.action) {
             BRIEFING -> { Notes.briefing(ctx); Alarms.schedule(ctx) }
             ALERT -> { Notes.alert(ctx, id); Alarms.schedule(ctx) }
-            CLEAR -> { Notes.dismiss(ctx, id); Ledger.update(ctx) { it.toggle(id, LocalDate.now(), LocalTime.now()) } }
+            CLEAR -> { tick(ctx, true); Notes.dismiss(ctx, id); Ledger.update(ctx) { it.toggle(id, LocalDate.now(), LocalTime.now()) } }
             SNOOZE -> { Notes.dismiss(ctx, id); Alarms.snooze(ctx, id) }
-            GOT -> Ledger.update(ctx) { it.mark(id, ItemState.GOT) }
-            NA -> Ledger.update(ctx) { it.mark(id, ItemState.NA) }
+            GOT -> { tick(ctx, true); Ledger.update(ctx) { it.mark(id, ItemState.GOT) } }
+            NA -> { tick(ctx, false); Ledger.update(ctx) { it.mark(id, ItemState.NA) } }
             MODE -> Ledger.update(ctx) { it.copy(widgetShop = id == 1) }
             // Day change, reboot, clock change, app update: settle the log and re-arm everything.
             else -> { Ledger.get(ctx); LedgerWidget.refresh(ctx); Alarms.schedule(ctx) }
         }
+    }
+
+    /** The same tick as in the app, for taps on the widget; touch usage, so it follows the touch-feedback setting. */
+    private fun tick(ctx: Context, ok: Boolean) {
+        val effect = VibrationEffect.createPredefined(if (ok) VibrationEffect.EFFECT_TICK else VibrationEffect.EFFECT_DOUBLE_CLICK)
+        ctx.getSystemService(VibratorManager::class.java).defaultVibrator
+            .vibrate(effect, VibrationAttributes.createForUsage(VibrationAttributes.USAGE_TOUCH))
     }
 
     companion object {
