@@ -1,0 +1,52 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      - name: Restore signing key
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.jks"
+
+      # Release build (not debuggable), signed with Black Ledger's private key.
+      - name: Build APK
+        env:
+          KEYSTORE_PATH: ${{ runner.temp }}/release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          gradle assembleRelease
+          mv app/build/outputs/apk/release/app-release.apk "BlackLedger-${{ github.run_number }}.apk"
+
+      # Also attach the APK to the run itself (Summary page → Artifacts).
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BlackLedger-${{ github.run_number }}
+          path: BlackLedger-${{ github.run_number }}.apk
+
+      # Full releases (not pre-releases) so Obtainium picks them up, tagged with the
+      # version the APK reports (0.1.N) so it can tell what's newer.
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.${{ github.run_number }}
+          name: Black Ledger 0.1.${{ github.run_number }}
+          prerelease: false
+          make_latest: true
+          files: BlackLedger-${{ github.run_number }}.apk
