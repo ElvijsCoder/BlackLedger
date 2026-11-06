@@ -10,19 +10,33 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 sealed interface Screen {
@@ -69,6 +83,8 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private val PAGES = listOf(Screen.Todo, Screen.Shop, Screen.Log)
+
 @Composable
 fun App(screen: MutableState<Screen>, today: LocalDate, intro: MutableState<Boolean>) {
     val data by Ledger.state
@@ -77,17 +93,21 @@ fun App(screen: MutableState<Screen>, today: LocalDate, intro: MutableState<Bool
     BackHandler(enabled = current != Screen.Todo) {
         screen.value = if (current == Screen.Report) Screen.Shop else Screen.Todo
     }
-    Box(Modifier.fillMaxSize()) {
-        Box(
-            Modifier.fillMaxSize().background(Ink.Black).systemBarsPadding().imePadding()
-                .padding(horizontal = 24.dp)
-        ) {
-            when (current) {
-                Screen.Todo -> DirectivesScreen(data, today, go)
-                Screen.Shop -> RequisitionScreen(data, go)
-                Screen.Report -> ReportScreen(data, today, go)
-                Screen.Log -> LogScreen(data, today, go)
-                is Screen.Edit -> key(current.id) { EditorScreen(data, current.id, today, go) }
+    Box(Modifier.fillMaxSize().background(Ink.Black)) {
+        // The three pages share one pager; Report and the editor open over them.
+        val layer: Screen = if (current in PAGES) Screen.Todo else current
+        AnimatedContent(
+            targetState = layer,
+            modifier = Modifier.fillMaxSize().systemBarsPadding().imePadding(),
+            transitionSpec = {
+                (fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 16 }) togetherWith fadeOut(tween(140))
+            },
+            label = "layer",
+        ) { shown ->
+            when (shown) {
+                is Screen.Edit -> key(shown.id) { Padded { EditorScreen(data, shown.id, today, go) } }
+                Screen.Report -> Padded { ReportScreen(data, today, go) }
+                else -> Pages(data, today, PAGES.indexOf(current).takeIf { it >= 0 }, go)
             }
         }
         // Cold-start opening, drawn over the app so the app is already there underneath.
@@ -98,6 +118,36 @@ fun App(screen: MutableState<Screen>, today: LocalDate, intro: MutableState<Bool
                 cleared = rows.count { it.status == Status.CLEARED },
                 onDone = { intro.value = false },
             )
+        }
+    }
+}
+
+@Composable
+private fun Padded(content: @Composable () -> Unit) = Box(Modifier.fillMaxSize().padding(horizontal = 24.dp)) { content() }
+
+/** To do · Shopping · Log: swipe between them or tap the tabs. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun Pages(data: Data, today: LocalDate, page: Int?, go: (Screen) -> Unit) {
+    val pager = rememberPagerState(initialPage = page ?: 0) { PAGES.size }
+    val scope = rememberCoroutineScope()
+    // Outside asked for a page (widget, back button, missed-log link): go there. Null while fading out.
+    LaunchedEffect(page) { if (page != null && pager.currentPage != page) pager.animateScrollToPage(page) }
+    // Swiped: keep the activity's idea of the page in step (back button, widget intents).
+    LaunchedEffect(pager) { snapshotFlow { pager.currentPage }.collect { go(PAGES[it]) } }
+
+    Column(Modifier.fillMaxSize()) {
+        Box(Modifier.padding(horizontal = 24.dp)) {
+            TabBar(pager, listOf("To do", "Shopping", "Log")) { i -> scope.launch { pager.animateScrollToPage(i) } }
+        }
+        HorizontalPager(pager, Modifier.weight(1f)) { p ->
+            Padded {
+                when (p) {
+                    0 -> DirectivesScreen(data, today, go)
+                    1 -> RequisitionScreen(data, go)
+                    else -> LogScreen(data, today)
+                }
+            }
         }
     }
 }

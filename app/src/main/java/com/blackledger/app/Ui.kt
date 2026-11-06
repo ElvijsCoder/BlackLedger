@@ -1,6 +1,8 @@
 package com.blackledger.app
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,6 +18,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,9 +27,13 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
@@ -37,6 +45,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import kotlin.math.abs
 
 object Ink {
     val Black = Color(0xFF000000)
@@ -85,24 +94,36 @@ fun Heading(title: String, sub: AnnotatedString) = Column(verticalArrangement = 
     Txt(sub, label(size = 11))
 }
 
+/** The fixed tab bar over the pager; the underline slides with your finger. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun Tabs(shop: Boolean, onTodo: () -> Unit, onShop: () -> Unit) = Row(
-    Modifier.fillMaxWidth().drawBehind {
-        drawLine(Ink.Line, Offset(0f, size.height), Offset(size.width, size.height), 1.dp.toPx())
-    },
-    horizontalArrangement = Arrangement.spacedBy(24.dp),
-) {
-    Tab("To do", !shop, onTodo)
-    Tab("Shopping", shop, onShop)
+fun TabBar(pager: PagerState, names: List<String>, onTab: (Int) -> Unit) {
+    val lefts = remember { mutableStateListOf(*Array(names.size) { 0f }) }
+    val widths = remember { mutableStateListOf(*Array(names.size) { 0f }) }
+    val pos = (pager.currentPage + pager.currentPageOffsetFraction).coerceIn(0f, (names.size - 1).toFloat())
+    Row(
+        Modifier.fillMaxWidth().drawBehind {
+            drawLine(Ink.Line, Offset(0f, size.height), Offset(size.width, size.height), 1.dp.toPx())
+            val i = pos.toInt().coerceAtMost(names.size - 2)
+            val f = pos - i
+            val x = lefts[i] + (lefts[i + 1] - lefts[i]) * f
+            val w = widths[i] + (widths[i + 1] - widths[i]) * f
+            drawLine(Ink.White, Offset(x, size.height), Offset(x + w, size.height), 1.5.dp.toPx())
+        },
+        horizontalArrangement = Arrangement.spacedBy(24.dp),
+    ) {
+        names.forEachIndexed { i, name ->
+            val near = 1f - abs(pos - i).coerceIn(0f, 1f)
+            Box(
+                Modifier.height(44.dp)
+                    .onGloballyPositioned { lefts[i] = it.positionInParent().x; widths[i] = it.size.width.toFloat() }
+                    .semantics { selected = pager.currentPage == i }
+                    .clickable(role = Role.Tab) { onTab(i) },
+                contentAlignment = Alignment.Center,
+            ) { Txt(name, body(15, lerp(Ink.Dim, Ink.White, near), FontWeight.Normal)) }
+        }
+    }
 }
-
-@Composable
-private fun Tab(text: String, on: Boolean, onClick: () -> Unit) = Box(
-    Modifier.height(44.dp).clickable(role = Role.Tab, onClick = onClick).drawBehind {
-        if (on) drawLine(Ink.White, Offset(0f, size.height), Offset(size.width, size.height), 1.5.dp.toPx())
-    },
-    contentAlignment = Alignment.Center,
-) { Txt(text, body(15, if (on) Ink.White else Ink.Dim, FontWeight.Normal)) }
 
 enum class Dot { OPEN, DONE, LATE, FUTURE }
 
@@ -169,8 +190,8 @@ fun RoundButton(glyph: Glyph, description: String, ring: Color, tint: Color, fil
 
 /** Full-width 56dp pill: filled for the main action, outlined otherwise. */
 @Composable
-fun Pill(text: String, filled: Boolean, enabled: Boolean = true, onClick: () -> Unit) = Box(
-    Modifier.fillMaxWidth().height(56.dp)
+fun Pill(text: String, filled: Boolean, enabled: Boolean = true, modifier: Modifier = Modifier.fillMaxWidth(), onClick: () -> Unit) = Box(
+    modifier.height(56.dp)
         .clip(RoundedCornerShape(28.dp))
         .background(if (filled && enabled) Ink.White else Color.Transparent, RoundedCornerShape(28.dp))
         .border(1.dp, if (enabled) Ink.White else Ink.Faint, RoundedCornerShape(28.dp))

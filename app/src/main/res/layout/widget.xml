@@ -89,6 +89,18 @@
         </LinearLayout>
     </LinearLayout>
 
+    <!-- Shopping progress: got (filled), not available (red), still to get (hollow). -->
+    <ImageView
+        android:id="@+id/strand"
+        android:layout_width="match_parent"
+        android:layout_height="12dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginEnd="6dp"
+        android:layout_marginBottom="6dp"
+        android:contentDescription="@null"
+        android:scaleType="fitCenter"
+        android:visibility="gone" />
+
     <!-- Scrolls, so any widget size shows the whole list. -->
     <FrameLayout
         android:layout_width="match_parent"

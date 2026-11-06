@@ -8,6 +8,11 @@ on:
 permissions:
   contents: write
 
+# Pushing twice in a row cancels the older build instead of queueing behind it.
+concurrency:
+  group: build
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest

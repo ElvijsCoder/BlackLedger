@@ -28,6 +28,9 @@ data class LogEntry(val id: Int, val date: LocalDate, val cleared: Boolean, val 
 enum class ItemState { TO_GET, GOT, NA }
 data class Item(val id: Int, val name: String, val state: ItemState = ItemState.TO_GET)
 
+/** A filed requisition: what was got and what the shop didn't have. */
+data class Trip(val n: Int, val date: LocalDate, val got: List<String>, val na: List<String>)
+
 data class Data(
     val directives: List<Directive> = emptyList(),
     val log: List<LogEntry> = emptyList(),
@@ -36,6 +39,7 @@ data class Data(
     val nextId: Int = 1,
     val settledThrough: LocalDate? = null,
     val widgetShop: Boolean = false,
+    val trips: List<Trip> = emptyList(),
 )
 
 enum class Status { LATE, OPEN, CLEARED }
@@ -126,10 +130,15 @@ fun Data.addItem(name: String): Data {
 fun Data.mark(id: Int, s: ItemState): Data = copy(items = items.map { if (it.id == id) it.copy(state = s) else it })
 fun Data.removeItem(id: Int): Data = copy(items = items.filterNot { it.id == id })
 
-/** Files the trip: whatever wasn't got and is in [carry] goes on the next requisition. */
-fun Data.endTrip(carry: Set<Int>): Data = copy(
+/** Files the trip into the log; whatever wasn't got and is in [carry] goes on the next requisition. */
+fun Data.endTrip(carry: Set<Int>, today: LocalDate): Data = copy(
     items = items.filter { it.state != ItemState.GOT && it.id in carry }.map { it.copy(state = ItemState.TO_GET) },
     trip = trip + 1,
+    trips = trips + Trip(
+        trip, today,
+        got = items.filter { it.state == ItemState.GOT }.map { it.name },
+        na = items.filter { it.state == ItemState.NA }.map { it.name },
+    ),
 )
 
 // Alarms

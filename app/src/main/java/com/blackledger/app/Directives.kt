@@ -70,13 +70,12 @@ fun DirectivesScreen(data: Data, today: LocalDate, go: (Screen) -> Unit) {
     val missedWeek = data.log.count { !it.cleared && it.date >= today.with(DayOfWeek.MONDAY) }
     val upcoming = data.upcoming(today)
 
-    Column(Modifier.fillMaxSize().padding(top = 24.dp, bottom = 24.dp)) {
+    Column(Modifier.fillMaxSize().padding(top = 18.dp, bottom = 24.dp)) {
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             item { TopLine("BLACK LEDGER · BL-01", dayLabel(today)) }
             item { Heading("Directives", AnnotatedString("TODAY · $cleared OF ${rows.size} CLEARED")) }
             // The strand reads left to right: cleared first, then what's left.
             if (rows.isNotEmpty()) item { Strand(rows.sortedBy { it.status != Status.CLEARED }.map { it.dot() }) }
-            item { Tabs(shop = false, onTodo = {}, onShop = { go(Screen.Shop) }) }
             item {
                 if (rows.isEmpty()) Txt("Nothing on file today.", body(16, Ink.Dim), Modifier.padding(vertical = 12.dp))
                 else Route(rows, today,
@@ -152,7 +151,7 @@ private fun Route(rows: List<Due>, today: LocalDate, onToggle: (Int) -> Unit, on
 }
 
 @Composable
-fun LogScreen(data: Data, today: LocalDate, go: (Screen) -> Unit) {
+fun LogScreen(data: Data, today: LocalDate) {
     val monthStart = today.withDayOfMonth(1)
     val inMonth = { d: LocalDate? -> d != null && d >= monthStart && d <= today }
     val missed = data.log.filter { !it.cleared && inMonth(it.date) }.sortedByDescending { it.date }
@@ -161,14 +160,10 @@ fun LogScreen(data: Data, today: LocalDate, go: (Screen) -> Unit) {
     val monday = today.with(DayOfWeek.MONDAY)
     val week = (0L..6L).map { monday.plusDays(it) }
     val recurring = data.directives.filter { it.recurring }
+    val trips = data.trips.asReversed().take(12)
 
-    LazyColumn(Modifier.fillMaxSize().padding(top = 12.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
-        item {
-            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                Txt("‹ DIRECTIVES", label(), Modifier.heightIn(min = 44.dp).clickable(role = Role.Button) { go(Screen.Todo) }.padding(vertical = 14.dp))
-                Txt("BL-04", label())
-            }
-        }
+    LazyColumn(Modifier.fillMaxSize().padding(top = 18.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
+        item { TopLine("BLACK LEDGER · BL-04", dayLabel(today)) }
         item {
             Heading("Log", buildAnnotatedString {
                 append("${today.month.name} · $clearedCount CLEARED · ")
@@ -213,6 +208,22 @@ fun LogScreen(data: Data, today: LocalDate, go: (Screen) -> Unit) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     for (e in last) Node(if (e.cleared) Dot.DONE else Dot.LATE, 9.dp)
                 }
+                Divider()
+            }
+        }
+        item { Txt("PAST REQUISITIONS", label()) }
+        if (trips.isEmpty()) item { Txt("No trips filed yet.", body(16, Ink.Dim)) }
+        items(trips) { t ->
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                    Txt("TRIP %03d · %s".format(t.n, SHORT.format(t.date).uppercase()), label(Ink.White))
+                    Txt(buildAnnotatedString {
+                        append("${t.got.size} GOT")
+                        if (t.na.isNotEmpty()) withStyle(SpanStyle(color = Ink.Red)) { append(" · ${t.na.size} N/A") }
+                    }, label())
+                }
+                if (t.got.isNotEmpty()) Txt(t.got.joinToString(" · "), body(15, Ink.Dim))
+                if (t.na.isNotEmpty()) Txt("N/A: " + t.na.joinToString(" · "), body(15, Ink.Red))
                 Divider()
             }
         }

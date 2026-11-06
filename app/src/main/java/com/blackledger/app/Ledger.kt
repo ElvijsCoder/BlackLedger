@@ -88,6 +88,14 @@ object Ledger {
                 put("at", e.at?.toString())
             }
         }))
+        put("trips", JSONArray(d.trips.map { t ->
+            JSONObject().apply {
+                put("n", t.n)
+                put("date", t.date.toString())
+                put("got", JSONArray(t.got))
+                put("na", JSONArray(t.na))
+            }
+        }))
         put("items", JSONArray(d.items.map { i ->
             JSONObject().apply {
                 put("id", i.id)
@@ -124,6 +132,10 @@ object Ledger {
             },
             log = o.optJSONArray("log").list { e ->
                 LogEntry(e.getInt("id"), LocalDate.parse(e.getString("date")), e.getBoolean("cleared"), e.time("at"))
+            },
+            trips = o.optJSONArray("trips").list { t ->
+                fun names(k: String) = t.optJSONArray(k)?.let { a -> (0 until a.length()).map { a.getString(it) } } ?: emptyList()
+                Trip(t.getInt("n"), LocalDate.parse(t.getString("date")), names("got"), names("na"))
             },
             items = o.optJSONArray("items").list { i ->
                 Item(i.getInt("id"), i.getString("name"), ItemState.valueOf(i.getString("state")))

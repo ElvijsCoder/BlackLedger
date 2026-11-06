@@ -42,13 +42,17 @@ Black and white, one red for things that went wrong. No accounts, no cloud, no b
 - **Next on file** shows what's coming after today.
 
 ### Log
-- This week as a strand, everything missed this month, and the last ten runs of every recurring directive as dots.
+- This week as a strand, everything missed this month, the last ten runs of every recurring directive as dots, and **past requisitions**: what each trip got and what the shop didn't have.
 
 ### Requisition
 - **Type and press enter.** The keyboard stays up. `milk, bread, eggs` files three at once.
 - **✓ Got** or **✕ Was not able to get.** Tap anything in the Got or N/A sections to put it back.
 - **Long-press** an item to strike it off entirely.
-- **End trip · file report.** Shows what you got and what you didn't, and asks per item whether to carry it to the next requisition or drop it.
+- **End trip · file report.** Shows what you got and what you didn't, and asks per item whether to carry it over or drop it. Then **File report** with those choices, or **Drop all** to start clean.
+
+### Moving around
+- **To do · Shopping · Log** are three pages: swipe between them or tap the tabs; the underline follows your finger.
+- New directive, edit and the trip report fade in over them.
 
 ### Opening
 - **The strand draws.** On a cold start a line draws across and one node lights per directive today, filled for the ones already cleared. Under a second, tap to skip. Skipped when the widget or a notification opens the app, and when Android's "Remove animations" is on.
@@ -60,6 +64,7 @@ Black and white, one red for things that went wrong. No accounts, no cloud, no b
 ### The widget
 - **One widget, two tabs:** *To do* and *Shop*, switched from its header.
 - **Any size** from 4×2 up: the list scrolls, and a tall widget fills its whole height.
+- Directives sit on the strand line; the requisition shows its progress strand across the top.
 - Clear, tick or cross straight from the home screen.
 
 ---
@@ -70,7 +75,7 @@ Black and white, one red for things that went wrong. No accounts, no cloud, no b
 |---|---|
 | New directive | **+ New directive** at the bottom of Directives |
 | Edit or delete one | Tap its name |
-| Missed log | **MISSED LOG** under Next on file |
+| Log and past trips | Swipe to **Log**, or **MISSED LOG** under Next on file |
 | Shopping list | **Shopping** tab, or the widget's *Shop* |
 | Remove a shopping item | Long-press its name |
 | End the trip | **End trip · file report** |

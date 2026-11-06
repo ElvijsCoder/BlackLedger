@@ -52,7 +52,7 @@ fun RequisitionScreen(data: Data, go: (Screen) -> Unit) {
     val na = data.items.filter { it.state == ItemState.NA }
     val set = { id: Int, s: ItemState -> Ledger.update(ctx) { it.mark(id, s) } }
 
-    Column(Modifier.fillMaxSize().padding(top = 24.dp, bottom = 24.dp)) {
+    Column(Modifier.fillMaxSize().padding(top = 18.dp, bottom = 24.dp)) {
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item { TopLine("BLACK LEDGER · BL-02", tripLabel(data.trip)) }
             item {
@@ -62,7 +62,6 @@ fun RequisitionScreen(data: Data, go: (Screen) -> Unit) {
                     append(" · ${toGet.size} TO GET")
                 })
             }
-            item { Tabs(shop = true, onTodo = { go(Screen.Todo) }, onShop = {}) }
             item {
                 AddField { text ->
                     // "milk, bread, eggs" files three items at once.
@@ -184,9 +183,16 @@ fun ReportScreen(data: Data, today: LocalDate, go: (Screen) -> Unit) {
             }
         }
         Spacer(Modifier.height(12.dp))
-        Pill("File report · start new requisition", filled = true) {
-            Ledger.update(ctx) { it.endTrip(carry) }
-            go(Screen.Shop)
+        // Two ways out: file with the carry / drop choices above, or drop everything left.
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Pill("Drop all", filled = false, modifier = Modifier.weight(1f)) {
+                Ledger.update(ctx) { it.endTrip(emptySet(), today) }
+                go(Screen.Shop)
+            }
+            Pill("File report", filled = true, modifier = Modifier.weight(1f)) {
+                Ledger.update(ctx) { it.endTrip(carry, today) }
+                go(Screen.Shop)
+            }
         }
     }
 }

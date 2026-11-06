@@ -40,8 +40,11 @@ fun main() {
     // Shopping: N/A carried, got dropped, unchecked carried only if chosen.
     var s = Data().addItem("Milk").addItem("Kefir").addItem(" Eggs ").addItem("  ")
     check(s.items.map { it.name } == listOf("Milk", "Kefir", "Eggs"))
-    s = s.mark(1, ItemState.GOT).mark(2, ItemState.NA).endTrip(carry = setOf(1, 2))
+    s = s.mark(1, ItemState.GOT).mark(2, ItemState.NA).endTrip(carry = setOf(1, 2), today = fri)
     check(s.items.map { it.name to it.state } == listOf("Kefir" to ItemState.TO_GET) && s.trip == 2)
+    check(s.trips.single() == Trip(1, fri, got = listOf("Milk"), na = listOf("Kefir")))
+    // Drop all: nothing carried.
+    check(s.endTrip(emptySet(), fri).items.isEmpty())
 
     check(nextAt(LocalDateTime.of(fri, LocalTime.of(8, 0)), LocalTime.of(7, 30)) == fri.plusDays(1).atTime(7, 30))
     check(ordinal(1) == "1ST" && ordinal(12) == "12TH" && ordinal(23) == "23RD")
