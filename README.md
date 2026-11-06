@@ -50,13 +50,16 @@ Black and white, one red for things that went wrong. No accounts, no cloud, no b
 - **Long-press** an item to strike it off entirely.
 - **End trip · file report.** Shows what you got and what you didn't, and asks per item whether to carry it to the next requisition or drop it.
 
+### Opening
+- **The strand draws.** On a cold start a line draws across and one node lights per directive today, filled for the ones already cleared. Under a second, tap to skip. Skipped when the widget or a notification opens the app, and when Android's "Remove animations" is on.
+
 ### Alerts
 - **Morning briefing at 07:30:** what's on today and what's overdue. Every directive is in it.
 - **Per-directive alerts** at a time you pick, off by default. *Clear* or *In 1 hour* right from the notification.
 
 ### The widget
 - **One widget, two tabs:** *To do* and *Shop*, switched from its header.
-- **4×2** shows three rows; stretch it to **4×4** on shopping days for six.
+- **Any size** from 4×2 up: the list scrolls, and a tall widget fills its whole height.
 - Clear, tick or cross straight from the home screen.
 
 ---
@@ -81,7 +84,7 @@ Black and white, one red for things that went wrong. No accounts, no cloud, no b
 - **Storage:** one `ledger.json` in private storage, written safely (temp file, then rename). Backups are off.
 - **Rules** live in `Model.kt` with no Android in them; `app/src/test/.../ModelCheck.kt` checks them on a plain JVM.
 - **Alarms:** exact `AlarmManager` alarms for the briefing, each alert and the midnight roll-over; re-armed after reboot and clock changes.
-- **Widget:** classic `RemoteViews`, rows added per draw, sized by the launcher.
+- **Widget:** classic `RemoteViews` with a scrolling list; one shared tap template, each button fills in its own action.
 
 ```
 app/src/main/java/com/blackledger/app/
@@ -93,6 +96,7 @@ app/src/main/java/com/blackledger/app/
 ├─ Directives.kt    Directives + Log
 ├─ Requisition.kt   Requisition + Report
 ├─ Editor.kt        new / edit directive
+├─ Intro.kt         the cold-start opening
 └─ Ui.kt            colours, type, strand, buttons
 ```
 
@@ -109,9 +113,9 @@ Same as Black Sand: push to `main`, GitHub Actions builds a signed APK as a rele
 | What | Where |
 |---|---|
 | Briefing time (07:30) | `BRIEFING` in `Alarms.kt` |
+| Opening timing | `tween(...)` and `delay(...)` in `Intro.kt` |
 | Snooze length (1 hour) | `snooze()` in `Alarms.kt` |
 | Red | `Ink.Red` in `Ui.kt`, `RED` in `LedgerWidget.kt`, `node_late.xml` |
-| Widget rows per size | `refresh()` in `LedgerWidget.kt` |
 
 ---
 

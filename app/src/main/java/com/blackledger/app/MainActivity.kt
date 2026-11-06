@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
@@ -35,6 +36,7 @@ sealed interface Screen {
 class MainActivity : ComponentActivity() {
     private val screen = mutableStateOf<Screen>(Screen.Todo)
     private val today = mutableStateOf(LocalDate.now())
+    private val intro = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,10 +46,14 @@ class MainActivity : ComponentActivity() {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
         }
         if (intent.getBooleanExtra("shop", false)) screen.value = Screen.Shop
+        // Opening on a cold start only; not when the widget or a notification sent you here mid-task,
+        // and not when Android's "Remove animations" is on.
+        val animations = Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f
+        intro.value = savedInstanceState == null && animations && !intent.hasExtra("shop") && !intent.hasExtra("note")
         Ledger.get(this)
         Alarms.schedule(this)
         LedgerWidget.refresh(this)
-        setContent { App(screen, today.value) }
+        setContent { App(screen, today.value, intro) }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -64,23 +70,34 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun App(screen: MutableState<Screen>, today: LocalDate) {
+fun App(screen: MutableState<Screen>, today: LocalDate, intro: MutableState<Boolean>) {
     val data by Ledger.state
     val go = { s: Screen -> screen.value = s }
     val current = screen.value
     BackHandler(enabled = current != Screen.Todo) {
         screen.value = if (current == Screen.Report) Screen.Shop else Screen.Todo
     }
-    Box(
-        Modifier.fillMaxSize().background(Ink.Black).systemBarsPadding().imePadding()
-            .padding(horizontal = 24.dp)
-    ) {
-        when (current) {
-            Screen.Todo -> DirectivesScreen(data, today, go)
-            Screen.Shop -> RequisitionScreen(data, go)
-            Screen.Report -> ReportScreen(data, today, go)
-            Screen.Log -> LogScreen(data, today, go)
-            is Screen.Edit -> key(current.id) { EditorScreen(data, current.id, today, go) }
+    Box(Modifier.fillMaxSize()) {
+        Box(
+            Modifier.fillMaxSize().background(Ink.Black).systemBarsPadding().imePadding()
+                .padding(horizontal = 24.dp)
+        ) {
+            when (current) {
+                Screen.Todo -> DirectivesScreen(data, today, go)
+                Screen.Shop -> RequisitionScreen(data, go)
+                Screen.Report -> ReportScreen(data, today, go)
+                Screen.Log -> LogScreen(data, today, go)
+                is Screen.Edit -> key(current.id) { EditorScreen(data, current.id, today, go) }
+            }
+        }
+        // Cold-start opening, drawn over the app so the app is already there underneath.
+        if (intro.value) {
+            val rows = data.today(today)
+            Intro(
+                dots = rows.sortedBy { it.status != Status.CLEARED }.map { it.dot() },
+                cleared = rows.count { it.status == Status.CLEARED },
+                onDone = { intro.value = false },
+            )
         }
     }
 }

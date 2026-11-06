@@ -40,7 +40,7 @@ private val DM = DateTimeFormatter.ofPattern("dd.MM", Locale.ENGLISH)
 
 fun dayLabel(d: LocalDate): String = DAY_LABEL.format(d).uppercase()
 
-private fun Due.dot() = when (status) {
+fun Due.dot() = when (status) {
     Status.CLEARED -> Dot.DONE
     Status.LATE -> Dot.LATE
     Status.OPEN -> Dot.OPEN

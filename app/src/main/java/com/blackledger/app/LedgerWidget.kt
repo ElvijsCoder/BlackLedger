@@ -6,7 +6,6 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.util.SizeF
 import android.view.View
 import android.widget.RemoteViews
 import java.time.LocalDate
@@ -26,18 +25,10 @@ class LedgerWidget : AppWidgetProvider() {
             val manager = AppWidgetManager.getInstance(ctx)
             val ids = manager.getAppWidgetIds(ComponentName(ctx, LedgerWidget::class.java))
             if (ids.isEmpty()) return
-            val data = Ledger.get(ctx)
-            // The launcher picks the biggest layout that fits: 4×2 shows 3 rows, 4×4 shows 6.
-            val views = RemoteViews(
-                mapOf(
-                    SizeF(200f, 100f) to build(ctx, data, 3),
-                    SizeF(200f, 300f) to build(ctx, data, 6),
-                )
-            )
-            manager.updateAppWidget(ids, views)
+            manager.updateAppWidget(ids, build(ctx, Ledger.get(ctx)))
         }
 
-        private fun build(ctx: Context, data: Data, rows: Int): RemoteViews {
+        private fun build(ctx: Context, data: Data): RemoteViews {
             val v = RemoteViews(ctx.packageName, R.layout.widget)
             val shop = data.widgetShop
             v.setTextColor(R.id.tab_todo, if (shop) DIM else WHITE)
@@ -47,28 +38,35 @@ class LedgerWidget : AppWidgetProvider() {
             v.setOnClickPendingIntent(R.id.tab_todo, broadcast(ctx, LedgerReceiver.MODE, 0))
             v.setOnClickPendingIntent(R.id.tab_shop, broadcast(ctx, LedgerReceiver.MODE, 1))
             v.setOnClickPendingIntent(R.id.title, open(ctx, shop))
-            v.removeAllViews(R.id.rows)
+
+            // Every row's buttons share one template; each button fills in its own action and id.
+            v.setPendingIntentTemplate(R.id.rows, PendingIntent.getBroadcast(
+                ctx, 0, Intent(ctx, LedgerReceiver::class.java),
+                PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            ))
+            v.setEmptyView(R.id.rows, R.id.empty)
+            val rows = RemoteViews.RemoteCollectionItems.Builder().setHasStableIds(true).setViewTypeCount(2)
 
             if (shop) {
                 val left = data.items.filter { it.state == ItemState.TO_GET }
                 v.setTextViewText(R.id.title, "Requisition")
                 v.setTextViewText(R.id.count, "${left.size} TO GET")
-                for (item in left.take(rows)) {
+                v.setTextViewText(R.id.empty, "Nothing to get.")
+                for (item in left) {
                     val r = RemoteViews(ctx.packageName, R.layout.widget_row_item)
                     r.setTextViewText(R.id.name, item.name)
-                    r.setOnClickPendingIntent(R.id.name, open(ctx, true))
-                    r.setOnClickPendingIntent(R.id.got, broadcast(ctx, LedgerReceiver.GOT, item.id))
-                    r.setOnClickPendingIntent(R.id.na, broadcast(ctx, LedgerReceiver.NA, item.id))
-                    v.addView(R.id.rows, r)
+                    r.setOnClickFillInIntent(R.id.got, fill(LedgerReceiver.GOT, item.id))
+                    r.setOnClickFillInIntent(R.id.na, fill(LedgerReceiver.NA, item.id))
+                    rows.addItem(item.id.toLong(), r)
                 }
-                if (left.isEmpty()) v.addView(R.id.rows, empty(ctx, "Nothing to get."))
             } else {
                 val today = LocalDate.now()
                 val all = data.today(today)
                 val open = all.filter { it.status != Status.CLEARED }
                 v.setTextViewText(R.id.title, "Directives")
                 v.setTextViewText(R.id.count, "${all.size - open.size}/${all.size} CLEARED")
-                for (row in open.take(rows)) {
+                v.setTextViewText(R.id.empty, if (all.isEmpty()) "Nothing on file today." else "All directives cleared.")
+                for (row in open) {
                     val r = RemoteViews(ctx.packageName, R.layout.widget_row_task)
                     val late = row.status == Status.LATE
                     r.setImageViewResource(R.id.node, if (late) R.drawable.node_late else R.drawable.node_open)
@@ -80,17 +78,17 @@ class LedgerWidget : AppWidgetProvider() {
                     }
                     r.setTextViewText(R.id.tag, tag)
                     r.setTextColor(R.id.tag, if (late) RED else DIM)
-                    r.setOnClickPendingIntent(R.id.name, open(ctx, false))
-                    r.setOnClickPendingIntent(R.id.check, broadcast(ctx, LedgerReceiver.CLEAR, row.d.id))
-                    v.addView(R.id.rows, r)
+                    r.setOnClickFillInIntent(R.id.check, fill(LedgerReceiver.CLEAR, row.d.id))
+                    rows.addItem(row.d.id.toLong(), r)
                 }
-                if (open.isEmpty()) v.addView(R.id.rows, empty(ctx, if (all.isEmpty()) "Nothing on file today." else "All directives cleared."))
             }
+            // ponytail: deprecated in API 35 but still the simplest scrolling widget list; move to Glance if it ever goes.
+            @Suppress("DEPRECATION")
+            v.setRemoteAdapter(R.id.rows, rows.build())
             return v
         }
 
-        private fun empty(ctx: Context, text: String) =
-            RemoteViews(ctx.packageName, R.layout.widget_row_empty).apply { setTextViewText(R.id.name, text) }
+        private fun fill(action: String, id: Int) = Intent().setAction(action).putExtra("id", id)
 
         private fun broadcast(ctx: Context, action: String, id: Int) = PendingIntent.getBroadcast(
             ctx, action.hashCode() * 31 + id,
